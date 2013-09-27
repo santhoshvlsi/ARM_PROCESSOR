@@ -6,10 +6,9 @@ module mem_addr_calc(
     input [2:0] func_in,
 	 input ctrl_ldm_stm_start_S3_in,
 	 input swp_ctrl_S3_in,
-	 output [31:0] addr_to_mem_out//,
-    //output [31:0] data_to_reg_update_out
-	 //output ldm_stm_inc_dec_out
-    );
+	 output [31:0] addr_to_mem_out,
+    output [31:0] data_to_reg_update_out
+	 );
 
 parameter ADD = 5'b110;
 parameter SUB = 5'b100;
@@ -72,9 +71,7 @@ base_addr_in) : (func_in[2] ? base_addr_dec : base_addr_in)) : (swp_ctrl_S3_in ?
 addr_to_mem_buff);
 assign base_addr_inc = base_addr_in + 32'h4;
 assign base_addr_dec = base_addr_in - 32'h4;
-//assign data_to_reg_update_out = instr_exec_in ? data_to_reg_update : 0;
-assign data_to_reg_update = (ctrl_ldm_stm_start_S3_in & func_in[0]) ? base_addr_in : 
+assign data_to_reg_update_out = (ctrl_ldm_stm_start_S3_in & func_in[0]) ? base_addr_in : 
 data_to_reg_update_buff;
-//assign ldm_stm_inc_dec_out = func_in[1];
 
 endmodule

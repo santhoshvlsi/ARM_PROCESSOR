@@ -26,7 +26,7 @@ wire use_rs_to_shift,ctrl_reg_imm_for_offset,ld_str_multiple_en,pipe_start,instr
 wire carry_BS;
 wire [`LD_STR_ADDR_GEN_STAGE_FINAL_SHIFT_AMOUNT:0] shift_amount;
 wire [`LD_STR_ADDR_GEN_STAGE_OFFSET_FINAL-1:0] offset_final;
-wire [`:`] addr_to_mem_frm_mem_addr_calc;
+wire [`LD_STR_ADDR_GEN_BASE_ADDR_SIZE-1:0] addr_to_mem_frm_mem_addr_calc;
 
 /******INSTR_TAG******/
 assign instr_tag = 
@@ -175,7 +175,7 @@ mem_addr_calc address_calculator (
     .func_in(add_calc_func), 
     .ctrl_ldm_stm_start_S3_in(1'b0), 
     .swp_ctrl_S3_in(ld_str_multiple_en), 
-    .addr_to_mem_out(addr_to_mem_frm_mem_addr_calc)/*, 
-    .data_to_reg_update_out(data_to_reg_update_out)*/
+    .addr_to_mem_out(addr_to_mem_frm_mem_addr_calc), 
+    .data_to_reg_update_out(rn_data_out)
     );
 endmodule
