@@ -7,7 +7,7 @@ module barrel_shifter(
 	 input instr_exec_in,
 	 output cf_out,
     output [31:0] data_out
-    );
+    ); 
 
 /*LSL = 0100
 LSR = 0000
