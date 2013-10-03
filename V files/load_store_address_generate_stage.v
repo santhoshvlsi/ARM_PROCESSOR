@@ -173,8 +173,10 @@ mem_addr_calc address_calculator (
     .base_addr_in(base_addr), 
     .offset_in(offset_final), 
     .func_in(add_calc_func), 
-    .ctrl_ldm_stm_start_S3_in(1'b0), 
+	 .ldm_stm_en_in(ldm_stm_en_in),
+    .ldm_stm_start_in(ldm_stm_start_in), 
     .swp_ctrl_S3_in(ld_str_multiple_en), 
+	 .swp_ctrl_S3_in(1'b0),
     .addr_to_mem_out(addr_to_mem_frm_mem_addr_calc), 
     .data_to_reg_update_out(rn_data_out)
     );

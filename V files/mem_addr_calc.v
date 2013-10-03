@@ -4,58 +4,77 @@ module mem_addr_calc(
     input [31:0] base_addr_in,
     input [31:0] offset_in,
     input [2:0] func_in,
-	 input ctrl_ldm_stm_start_S3_in,
+	 input ldm_stm_en_in,
+	 input ldm_stm_start_in,
 	 input swp_ctrl_S3_in,
 	 output [31:0] addr_to_mem_out,
     output [31:0] data_to_reg_update_out
 	 );
 
-parameter ADD = 5'b110;
-parameter SUB = 5'b100;
-parameter PRE_ADD = 5'b111;
-parameter PRE_SUB = 5'b101;
-parameter POST_ADD = 5'b010;
-parameter POST_SUB = 5'b000;
+parameter NO_MULTIPLE_POST_SUB = 4'b000;
+parameter MULTIPLE_POST_SUB = 4'b110;
+parameter NO_MULTIPLE_POST_ADD = 4'b001;
+parameter MULTIPLE_POST_ADD = 4'b111;
+parameter NO_MULTIPLE_PRE_SUB = 4'b010;
+parameter MULTIPLE_PRE_SUB = 4'b100;
+parameter NO_MULTIPLE_PRE_ADD = 4'b011;
+parameter MULTIPLE_PRE_ADD = 4'b101;
+
+
+
 
 reg [31:0] addr_to_mem_buff;
 reg [31:0] data_to_reg_update_buff;
-wire [31:0] addr_to_mem;
-wire [31:0] base_addr_inc;
-wire [31:0] base_addr_dec;
-wire [31:0] data_to_reg_update;
+wire [3:0] func;
+wire [31:0] base_reg_for_add,base_addr_frm_reg;
+
+assign func = {ldm_stm_en_in,func_in};
+
+assign base_reg_for_add = ldm_stm_en_in ? (ldm_stm_start_in ? base_addr_in : base_addr_frm_reg) : 
+base_addr_in;
 
 always@(*)
 begin
-	case (func_in)
-		ADD : 
+	case (func)
+		NO_MULTIPLE_POST_SUB : 
 		begin
-			addr_to_mem_buff = base_addr_in + offset_in;
-			data_to_reg_update_buff = base_addr_in + offset_in;
+			addr_to_mem_buff = base_reg_for_add;
+			data_to_reg_update_buff = base_reg_for_add - offset_in;
 		end
-		SUB : 
+		NO_MULTIPLE_POST_ADD : 
 		begin
-			addr_to_mem_buff = base_addr_in - offset_in;
-			data_to_reg_update_buff = base_addr_in - offset_in;
+			addr_to_mem_buff = base_reg_for_add;
+			data_to_reg_update_buff = base_reg_for_add + offset_in;
 		end
-		PRE_ADD : 
+		NO_MULTIPLE_PRE_SUB :
 		begin
-			addr_to_mem_buff = base_addr_in + offset_in;
-			data_to_reg_update_buff = base_addr_in + offset_in;
+			addr_to_mem_buff = base_reg_for_add - offset_in;
+			data_to_reg_update_buff = base_reg_for_add - offset_in;
 		end
-		PRE_SUB : 
+		NO_MULTIPLE_PRE_ADD : 
 		begin
-			addr_to_mem_buff = base_addr_in - offset_in;
-			data_to_reg_update_buff = base_addr_in - offset_in;
+			addr_to_mem_buff = base_reg_for_add + offset_in;
+			data_to_reg_update_buff = base_reg_for_add + offset_in;
 		end
-		POST_ADD :
+		MULTIPLE_PRE_SUB : 
 		begin
-			addr_to_mem_buff = base_addr_in;
-			data_to_reg_update_buff = base_addr_in + offset_in;
+			addr_to_mem_buff = base_reg_for_add - offset_in;
+			data_to_reg_update_buff = base_reg_for_add - offset_in;
 		end
-		POST_SUB : 
+		MULTIPLE_PRE_ADD : 
 		begin
-			addr_to_mem_buff = base_addr_in;
-			data_to_reg_update_buff = base_addr_in - offset_in;
+			addr_to_mem_buff = base_reg_for_add + offset_in;
+			data_to_reg_update_buff = base_reg_for_add + offset_in;
+		end
+		MULTIPLE_POST_SUB :
+		begin
+			addr_to_mem_buff = base_reg_for_add;
+			data_to_reg_update_buff = base_reg_for_add - offset_in;
+		end
+		MULTIPLE_POST_ADD : 
+		begin
+			addr_to_mem_buff = base_reg_for_add;
+			data_to_reg_update_buff = base_reg_for_add + offset_in;
 		end
 		default : 
 		begin
@@ -65,13 +84,15 @@ begin
 	endcase
 end
 
-assign addr_to_mem_out = addr_to_mem;
-assign addr_to_mem = ctrl_ldm_stm_start_S3_in ? (func_in[1] ? (func_in[2] ? base_addr_inc : 
-base_addr_in) : (func_in[2] ? base_addr_dec : base_addr_in)) : (swp_ctrl_S3_in ? base_addr_in : 
-addr_to_mem_buff);
-assign base_addr_inc = base_addr_in + 32'h4;
-assign base_addr_dec = base_addr_in - 32'h4;
-assign data_to_reg_update_out = (ctrl_ldm_stm_start_S3_in & func_in[0]) ? base_addr_in : 
-data_to_reg_update_buff;
+register_with_reset #32 reg_base_reg_for_add (
+		 .data_in(base_reg_for_add), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(base_addr_frm_reg)
+		 );
+
+assign addr_to_mem_out = swp_ctrl_S3_in ? base_addr_in : addr_to_mem_buff;
+assign data_to_reg_update_out = data_to_reg_update_buff;
 
 endmodule
