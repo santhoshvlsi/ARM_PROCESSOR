@@ -19,7 +19,7 @@ assign temp_data = data_in & temp_data_for_priority_encoder;
 
 /******DATA_TO_AND_WITH_DATA_IN******/
 assign temp_data_for_priority_encoder = (ldm_stm_start_in ? 16'b1111_1111_1111_1111 : 
-(ldm_stm_en_out ? reg_data_for_priority_encoder : 0));
+(ldm_stm_en_reg ? reg_data_for_priority_encoder : 0));
 /******DATA_TO_AND_WITH_DATA_IN******/
 
 /******PRIORITY_ENCODER******/
@@ -120,13 +120,13 @@ register_with_reset #16 reg_temp_reg_for_priority_encoder (
 		 .en_in(ldm_stm_en), 
 		 .data_out(reg_data_for_priority_encoder)
 		 );
-/*register_with_reset #1 reg_ldm_stm_en (
+register_with_reset #1 reg_ldm_stm_en (
 		 .data_in(ldm_stm_en), 
 		 .clk_in(clk_in), 
 		 .reset_in(reset_in), 
 		 .en_in(1'b1), 
-		 .data_out(ldm_stm_en_out)
-		 );*/
+		 .data_out(ldm_stm_en_reg)
+		 );
 
 assign ldm_stm_en_out = ldm_stm_en;
 assign reg_addr_out = reg_addr;

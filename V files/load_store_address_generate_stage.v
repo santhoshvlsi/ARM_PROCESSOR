@@ -3,7 +3,19 @@
 module load_store_address_GEN_stage(
 					input clk_in,
 					input reset_in,
-					input [`LD_STR_ADDR_GEN_STAGE_CONTROL_WORD-1:0] ld_str_addr_gen_stage_control_word_in
+					input [`LD_STR_ADDR_GEN_STAGE_CONTROL_WORD-1:0] ld_str_addr_gen_stage_control_word_in,
+					output [`LD_STR_ADDR_GEN_RD_ADDR_SIZE-1:0] rd_addr_out,
+					output [`LD_STR_ADDR_GEN_RN_ADDR_SIZE-1:0] rn_addr_out,
+					output ld_str_multiple_flag_out,
+					output [`LD_STR_ADDR_GEN_BASE_ADDR_SIZE-1:0] addr_to_mem_out,
+					output [`LD_STR_ADDR_GEN_INSTR_TAG_SIZE-1:0] instr_tag_out,
+					output [`LD_STR_ADDR_GEN_IMM_STR_RN_DATA_SIZE-1:0] rn_data_out,
+					output [`LD_STR_ADDR_GEN_IMM_CTRL_LD_MUX_SIZE-1:0] ctrl_ld_mux_out,
+					output [`LD_STR_ADDR_GEN_IMM_CTRL_STR_MUX_SIZE-1:0] ctrl_str_mux_out,
+					output [`LD_STR_ADDR_GEN_IMM_W_EN_SIZE-1:0] w_en_out,
+					output instr_exec_confirmed_out,
+					output pipe_start_out
+					
     );
 
 wire [`LD_STR_ADDR_GEN_INSTR_TAG_SIZE-1:0] instr_tag;
@@ -27,6 +39,10 @@ wire carry_BS;
 wire [`LD_STR_ADDR_GEN_STAGE_FINAL_SHIFT_AMOUNT:0] shift_amount;
 wire [`LD_STR_ADDR_GEN_STAGE_OFFSET_FINAL-1:0] offset_final;
 wire [`LD_STR_ADDR_GEN_BASE_ADDR_SIZE-1:0] addr_to_mem_frm_mem_addr_calc;
+wire ld_str_multiple_flag;
+wire [`LD_STR_RN_UPDATE_DATA_SIZE-1:0] rn_data_update;
+wire [`LD_STR_ADDR_GEN_STAGE_LDM_STM_DATA_SIZE-1:0] ldm_stm_data;
+wire [`LD_STR_ADDR_GEN_RD_ADDR_SIZE-1:0] reg_addr_frm_ldm_stm_gen,reg_addr_final;
 
 /******INSTR_TAG******/
 assign instr_tag = 
@@ -167,17 +183,118 @@ barrel_shifter barr_shifter (
     );
 /******BARREL_SHIFTER******/
 
-assign offset_final = ctrl_reg_imm_for_offset ? offset_frm_register_in : {{20{1'b0}},offset_in};
+assign offset_final = ctrl_reg_imm_for_offset ? alu_operandB_BS : {{20{1'b0}},imm_offset};
 
 mem_addr_calc address_calculator (
-    .base_addr_in(base_addr), 
+    .clk_in(clk_in),
+	 .reset_in(reset_in),
+	 .base_addr_in(base_addr), 
     .offset_in(offset_final), 
-    .func_in(add_calc_func), 
-	 .ldm_stm_en_in(ldm_stm_en_in),
-    .ldm_stm_start_in(ldm_stm_start_in), 
-    .swp_ctrl_S3_in(ld_str_multiple_en), 
-	 .swp_ctrl_S3_in(1'b0),
-    .addr_to_mem_out(addr_to_mem_frm_mem_addr_calc), 
-    .data_to_reg_update_out(rn_data_out)
+    .func_in(add_calc_func[2:1]), 
+	 .ldm_stm_en_in(ld_str_multiple_flag),
+    .ldm_stm_start_in(ld_str_multiple_en & instr_exec_confirmed), 
+    .swp_ctrl_S3_in(1'b0), 
+	 .addr_to_mem_out(addr_to_mem_frm_mem_addr_calc), 
+    .data_to_reg_update_out(rn_data_update)
     );
+
+ldm_stm_reg_addr_generator ldm_stm_addr_calculator (
+		.clk_in(clk_in), 
+		.reset_in(reset_in), 
+		.ldm_stm_start_in(ld_str_multiple_en & instr_exec_confirmed), 
+		.data_in(ldm_stm_data), 
+		.reg_addr_out(reg_addr_frm_ldm_stm_gen), 
+		.ldm_stm_en_out(ld_str_multiple_flag)
+	);
+
+assign reg_addr_final = ld_str_multiple_flag ? reg_addr_frm_ldm_stm_gen : rd_addr;
+
+register_with_reset #`LD_STR_ADDR_GEN_RD_ADDR_SIZE reg_rd_addr_out (
+		 .data_in(reg_addr_final), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(rd_addr_out)
+		 );
+
+register_with_reset #`LD_STR_ADDR_GEN_RN_ADDR_SIZE reg_rn_addr_out (
+		 .data_in(rn_addr), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(rn_addr_out)
+		 );
+
+register_with_reset #1 reg_ld_str_multiple_flag_out (
+		 .data_in(ld_str_multiple_flag), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(ld_str_multiple_flag_out)
+		 );
+
+register_with_reset #`LD_STR_ADDR_GEN_BASE_ADDR_SIZE reg_addr_to_mem_out (
+		 .data_in(addr_to_mem_frm_mem_addr_calc), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(addr_to_mem_out)
+		 );
+
+register_with_reset #`LD_STR_ADDR_GEN_INSTR_TAG_SIZE reg_instr_tag_out (
+		 .data_in(instr_tag), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(instr_tag_out)
+		 );
+
+register_with_reset #`LD_STR_ADDR_GEN_IMM_STR_RN_DATA_SIZE reg_rn_data_out (
+		 .data_in(rn_data_update), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(rn_data_out)
+		 );
+
+register_with_reset #`LD_STR_ADDR_GEN_IMM_CTRL_LD_MUX_SIZE reg_ctrl_ld_mux_out (
+		 .data_in(ctrl_ld_mux), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(ctrl_ld_mux_out)
+		 );
+
+register_with_reset #`LD_STR_ADDR_GEN_IMM_CTRL_STR_MUX_SIZE reg_ctrl_str_mux_out (
+		 .data_in(ctrl_str_mux), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(ctrl_str_mux_out)
+		 );
+
+register_with_reset #`LD_STR_ADDR_GEN_IMM_W_EN_SIZE reg_w_en_out (
+		 .data_in(w_en), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(w_en_out)
+		 );
+
+register_with_reset #1 reg_instr_exec_confirmed_out (
+		 .data_in(instr_exec_confirmed), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(instr_exec_confirmed_out)
+		 );
+
+register_with_reset #1 reg_pipe_start_out (
+		 .data_in(pipe_start), 
+		 .clk_in(clk_in), 
+		 .reset_in(reset_in), 
+		 .en_in(1'b1), 
+		 .data_out(pipe_start_out)
+		 );
+
 endmodule
